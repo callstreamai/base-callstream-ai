@@ -25,9 +25,7 @@ export function getBrowserSupabase(): SupabaseClient | null {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !key) return null;
-  // Lazy import to avoid SSR issues
-  const { createClient: cc } = require('@supabase/supabase-js');
-  _browserClient = cc(url, key, { auth: { persistSession: true } });
+  _browserClient = createClient(url, key, { auth: { persistSession: true } });
   return _browserClient;
 }
 
