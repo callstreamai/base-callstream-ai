@@ -32,25 +32,30 @@ type DiffLine = { type: 'added' | 'removed' | 'unchanged'; text: string; lineNum
  * Longest Common Subsequence — returns indices of matching lines.
  * Kept simple/bounded so it doesn't lock up the browser on huge flows.
  */
+/** Normalize a line for comparison: collapse whitespace so indentation differences don't break the LCS */
+function normLine(s: string) { return s.trimEnd().replace(/^\s+/, '').replace(/\s+/g, ' '); }
+
 function computeDiff(oldLines: string[], newLines: string[]): DiffLine[] {
-  const MAX = 400; // cap for LCS to stay fast
+  const MAX = 600;
   const a = oldLines.slice(0, MAX);
   const b = newLines.slice(0, MAX);
+  const an = a.map(normLine);
+  const bn = b.map(normLine);
   const m = a.length, n = b.length;
 
-  // Build LCS table
+  // Build LCS table on normalized lines
   const dp: number[][] = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
   for (let i = 1; i <= m; i++) {
     for (let j = 1; j <= n; j++) {
-      dp[i][j] = a[i - 1] === b[j - 1] ? dp[i - 1][j - 1] + 1 : Math.max(dp[i - 1][j], dp[i][j - 1]);
+      dp[i][j] = an[i - 1] === bn[j - 1] ? dp[i - 1][j - 1] + 1 : Math.max(dp[i - 1][j], dp[i][j - 1]);
     }
   }
 
-  // Backtrack to produce diff
+  // Backtrack — emit original (non-normalized) text
   const result: DiffLine[] = [];
   let i = m, j = n;
   while (i > 0 || j > 0) {
-    if (i > 0 && j > 0 && a[i - 1] === b[j - 1]) {
+    if (i > 0 && j > 0 && an[i - 1] === bn[j - 1]) {
       result.unshift({ type: 'unchanged', text: a[i - 1] });
       i--; j--;
     } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
@@ -62,7 +67,6 @@ function computeDiff(oldLines: string[], newLines: string[]): DiffLine[] {
     }
   }
 
-  // Append any overflow lines as unchanged
   for (let k = MAX; k < oldLines.length; k++) result.push({ type: 'unchanged', text: oldLines[k] });
   return result;
 }
@@ -75,7 +79,8 @@ function extractCodeBlock(md: string): string {
 
 // ─── Diff view component ──────────────────────────────────────────────────────
 function DiffView({ original, fixed }: { original: string; fixed: string }) {
-  const [collapsed, setCollapsed] = React.useState(false);
+  // Default to collapsed — show only the changed lines + context
+  const [collapsed, setCollapsed] = React.useState(true);
 
   const oldLines = original.split('\n');
   const newLines = fixed.split('\n');
@@ -88,9 +93,17 @@ function DiffView({ original, fixed }: { original: string; fixed: string }) {
 
   // For collapsed view: only show changed lines + 2 lines context around each change
   const displayLines = React.useMemo(() => {
+    // collapsed=true → show only changed lines + 3 lines of context around each change
+    // collapsed=false → show full diff
     if (!collapsed) return diff;
     const changed = new Set<number>();
-    diff.forEach((d, i) => { if (d.type !== 'unchanged') { for (let k = i - 2; k <= i + 2; k++) changed.add(k); } });
+    diff.forEach((d, i) => {
+      if (d.type !== 'unchanged') {
+        for (let k = i - 3; k <= i + 3; k++) {
+          if (k >= 0 && k < diff.length) changed.add(k);
+        }
+      }
+    });
     const out: (DiffLine | { type: 'ellipsis' })[] = [];
     let lastShown = -1;
     diff.forEach((d, i) => {
@@ -117,7 +130,7 @@ function DiffView({ original, fixed }: { original: string; fixed: string }) {
           onClick={() => setCollapsed(c => !c)}
           className="text-[12px] text-ink-600 hover:text-ink-800 font-semibold transition-colors"
         >
-          {collapsed ? 'Show all lines' : 'Show changes only'}
+          {collapsed ? 'Show full flow' : 'Changes only'}
         </button>
       </div>
 
