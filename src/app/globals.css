@@ -1,0 +1,127 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body {
+  background: #000;
+  color: #e7e9ea;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  border-color: #2f3336;
+}
+
+/* x.com style scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #2f3336;
+  border-radius: 8px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3d4144;
+}
+
+/* Markdown rendering */
+.prose-base p {
+  margin: 0.5rem 0;
+  line-height: 1.55;
+}
+.prose-base h1,
+.prose-base h2,
+.prose-base h3 {
+  font-weight: 700;
+  margin-top: 1.25rem;
+  margin-bottom: 0.5rem;
+  letter-spacing: -0.01em;
+}
+.prose-base h1 {
+  font-size: 1.4rem;
+}
+.prose-base h2 {
+  font-size: 1.2rem;
+}
+.prose-base h3 {
+  font-size: 1.05rem;
+}
+.prose-base ul,
+.prose-base ol {
+  padding-left: 1.4rem;
+  margin: 0.5rem 0;
+}
+.prose-base li {
+  margin: 0.2rem 0;
+}
+.prose-base code:not(pre code) {
+  background: #16181c;
+  border: 1px solid #2f3336;
+  padding: 1px 6px;
+  border-radius: 6px;
+  font-size: 0.875em;
+  color: #e7e9ea;
+}
+.prose-base pre {
+  background: #0a0a0a;
+  border: 1px solid #2f3336;
+  border-radius: 12px;
+  padding: 14px 16px;
+  overflow-x: auto;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  margin: 0.75rem 0;
+}
+.prose-base pre code {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  color: #e7e9ea;
+}
+.prose-base a {
+  color: #d560b2;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.prose-base blockquote {
+  border-left: 3px solid #d560b2;
+  padding-left: 12px;
+  margin: 0.75rem 0;
+  color: #8b8f94;
+}
+
+/* Subtle pulse animation for waveform */
+@keyframes pulseSoft {
+  0%, 100% { opacity: 0.95; }
+  50% { opacity: 0.65; }
+}
+.wave-pulse path:nth-child(2) {
+  animation: pulseSoft 2.4s ease-in-out infinite;
+}
+.wave-pulse path:nth-child(3) {
+  animation: pulseSoft 2.4s ease-in-out 0.3s infinite;
+}
+.wave-pulse path:nth-child(4) {
+  animation: pulseSoft 2.4s ease-in-out 0.6s infinite;
+}
+
+/* Loading shimmer */
+@keyframes shimmer {
+  0% { background-position: -800px 0; }
+  100% { background-position: 800px 0; }
+}
+.shimmer {
+  background: linear-gradient(90deg, #16181c 0%, #1d1f23 50%, #16181c 100%);
+  background-size: 800px 100%;
+  animation: shimmer 1.6s linear infinite;
+}
