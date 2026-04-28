@@ -25,6 +25,149 @@ function fmtBytes(n: number) {
   return `${(n / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+// ─── Diff utilities ───────────────────────────────────────────────────────────
+type DiffLine = { type: 'added' | 'removed' | 'unchanged'; text: string; lineNum?: number };
+
+/**
+ * Longest Common Subsequence — returns indices of matching lines.
+ * Kept simple/bounded so it doesn't lock up the browser on huge flows.
+ */
+function computeDiff(oldLines: string[], newLines: string[]): DiffLine[] {
+  const MAX = 400; // cap for LCS to stay fast
+  const a = oldLines.slice(0, MAX);
+  const b = newLines.slice(0, MAX);
+  const m = a.length, n = b.length;
+
+  // Build LCS table
+  const dp: number[][] = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      dp[i][j] = a[i - 1] === b[j - 1] ? dp[i - 1][j - 1] + 1 : Math.max(dp[i - 1][j], dp[i][j - 1]);
+    }
+  }
+
+  // Backtrack to produce diff
+  const result: DiffLine[] = [];
+  let i = m, j = n;
+  while (i > 0 || j > 0) {
+    if (i > 0 && j > 0 && a[i - 1] === b[j - 1]) {
+      result.unshift({ type: 'unchanged', text: a[i - 1] });
+      i--; j--;
+    } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
+      result.unshift({ type: 'added', text: b[j - 1] });
+      j--;
+    } else {
+      result.unshift({ type: 'removed', text: a[i - 1] });
+      i--;
+    }
+  }
+
+  // Append any overflow lines as unchanged
+  for (let k = MAX; k < oldLines.length; k++) result.push({ type: 'unchanged', text: oldLines[k] });
+  return result;
+}
+
+/** Extract the first ```python or ``` code block from markdown */
+function extractCodeBlock(md: string): string {
+  const m = md.match(/```(?:python)?\n([\s\S]*?)```/);
+  return m ? m[1] : '';
+}
+
+// ─── Diff view component ──────────────────────────────────────────────────────
+function DiffView({ original, fixed }: { original: string; fixed: string }) {
+  const [collapsed, setCollapsed] = React.useState(false);
+
+  const oldLines = original.split('\n');
+  const newLines = fixed.split('\n');
+  const diff = React.useMemo(() => computeDiff(oldLines, newLines), [original, fixed]);
+
+  const addedCount = diff.filter(d => d.type === 'added').length;
+  const removedCount = diff.filter(d => d.type === 'removed').length;
+
+  if (addedCount === 0 && removedCount === 0) return null;
+
+  // For collapsed view: only show changed lines + 2 lines context around each change
+  const displayLines = React.useMemo(() => {
+    if (!collapsed) return diff;
+    const changed = new Set<number>();
+    diff.forEach((d, i) => { if (d.type !== 'unchanged') { for (let k = i - 2; k <= i + 2; k++) changed.add(k); } });
+    const out: (DiffLine | { type: 'ellipsis' })[] = [];
+    let lastShown = -1;
+    diff.forEach((d, i) => {
+      if (changed.has(i)) {
+        if (lastShown >= 0 && i > lastShown + 1) out.push({ type: 'ellipsis' });
+        out.push(d);
+        lastShown = i;
+      }
+    });
+    return out;
+  }, [diff, collapsed]);
+
+  return (
+    <div className="mt-5 rounded-2xl border border-ink-400/70 overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-3 px-4 py-3 bg-ink-200/60 border-b border-ink-400/70">
+        <div className="flex items-center gap-3">
+          <span className="font-semibold text-[13.5px]">What changed</span>
+          <span className="text-[12px] px-2 py-0.5 rounded-full bg-[rgba(0,186,124,0.15)] text-[#00ba7c] font-semibold">+{addedCount}</span>
+          <span className="text-[12px] px-2 py-0.5 rounded-full bg-[rgba(244,33,46,0.12)] text-[#f4212e] font-semibold">−{removedCount}</span>
+        </div>
+        <button
+          type="button"
+          onClick={() => setCollapsed(c => !c)}
+          className="text-[12px] text-ink-600 hover:text-ink-800 font-semibold transition-colors"
+        >
+          {collapsed ? 'Show all lines' : 'Show changes only'}
+        </button>
+      </div>
+
+      {/* Diff body */}
+      <div className="overflow-x-auto bg-[#0a0a0a]">
+        <table className="w-full border-collapse font-mono text-[12.5px] leading-5">
+          <tbody>
+            {displayLines.map((line, i) => {
+              if ('type' in line && line.type === 'ellipsis') {
+                return (
+                  <tr key={`el-${i}`}>
+                    <td colSpan={2} className="px-4 py-1 text-ink-600 text-[11px] bg-ink-200/30 select-none">⋯</td>
+                  </tr>
+                );
+              }
+              const d = line as DiffLine;
+              const bg =
+                d.type === 'added' ? 'bg-[rgba(0,186,124,0.08)]' :
+                d.type === 'removed' ? 'bg-[rgba(244,33,46,0.08)]' :
+                '';
+              const textColor =
+                d.type === 'added' ? 'text-[#4ade80]' :
+                d.type === 'removed' ? 'text-[#f87171]' :
+                'text-ink-600';
+              const prefix =
+                d.type === 'added' ? '+' :
+                d.type === 'removed' ? '−' :
+                ' ';
+              const prefixColor =
+                d.type === 'added' ? 'text-[#00ba7c] font-bold select-none' :
+                d.type === 'removed' ? 'text-[#f4212e] font-bold select-none' :
+                'text-ink-500 select-none';
+
+              return (
+                <tr key={i} className={`${bg} group`}>
+                  <td className={`w-6 pl-3 pr-2 py-0.5 ${prefixColor} shrink-0`}>{prefix}</td>
+                  <td className={`pr-6 pl-1 py-0.5 whitespace-pre ${textColor} ${d.type === 'removed' ? 'line-through opacity-60' : ''}`}>
+                    {d.text || '\u00a0'}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ─── Fields config ────────────────────────────────────────────────────────────
 const FIELDS = [
   { key: 'problem', label: '1. Describe the problem', hint: 'What is going wrong with your voice AI agent?', placeholder: "e.g. The agent hangs up before saying goodbye, or loops infinitely without routing.", rows: 3 },
   { key: 'flow', label: '2. Current Based flow', hint: 'Paste your current flow here, or load a saved one below.', placeholder: 'loop:\n    res = talk("You are a helpful receptionist.", False)\n    until "caller wants to schedule":\n        say("Sure, let me help.")', rows: 9, mono: true },
@@ -32,11 +175,14 @@ const FIELDS = [
   { key: 'goal', label: '4. Goal', hint: 'What should the agent do instead?', placeholder: "Confirm the appointment, log it to our CRM, and say a friendly goodbye before hanging up.", rows: 3 },
 ];
 
+// ─── Page ─────────────────────────────────────────────────────────────────────
 export default function DebuggingPage() {
   const [values, setValues] = React.useState({ problem: '', flow: '', example: '', goal: '' });
   const [attachments, setAttachments] = React.useState<Attachment[]>([]);
   const [loading, setLoading] = React.useState(false);
   const [answer, setAnswer] = React.useState<string | null>(null);
+  // Store the original flow at submit time for diffing
+  const [submittedFlow, setSubmittedFlow] = React.useState('');
   const [error, setError] = React.useState<string | null>(null);
   const [copied, setCopied] = React.useState(false);
   const fileRef = React.useRef<HTMLInputElement>(null);
@@ -45,10 +191,7 @@ export default function DebuggingPage() {
   const totalBytes = attachments.reduce((s, a) => s + a.size, 0);
 
   function update(k: string, v: string) { setValues(p => ({ ...p, [k]: v })); }
-
-  function loadFlow(f: SavedFlow) {
-    setValues(p => ({ ...p, flow: f.code }));
-  }
+  function loadFlow(f: SavedFlow) { setValues(p => ({ ...p, flow: f.code })); }
 
   async function onFiles(list: FileList | null) {
     if (!list) return;
@@ -68,6 +211,7 @@ export default function DebuggingPage() {
     if (!values.problem.trim() && !values.flow.trim() && !values.example.trim() && !values.goal.trim() && !attachments.length) {
       setError('Fill in at least one field or attach a file.'); return;
     }
+    setSubmittedFlow(values.flow.trim());
     setLoading(true);
     try {
       const resp = await fetch('/api/ask', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...values, attachments }) });
@@ -77,6 +221,10 @@ export default function DebuggingPage() {
     } catch (err) { setError(err instanceof Error ? err.message : 'Network error.'); }
     finally { setLoading(false); }
   }
+
+  // Extract fixed code from the answer for diffing
+  const fixedCode = React.useMemo(() => answer ? extractCodeBlock(answer) : '', [answer]);
+  const showDiff = !!submittedFlow && !!fixedCode;
 
   return (
     <main className="min-h-screen bg-black">
@@ -103,13 +251,9 @@ export default function DebuggingPage() {
                   <span className="text-[11px] text-ink-600">optional</span>
                 </div>
                 <span className="block text-[12.5px] text-ink-600 mt-0.5">{f.hint}</span>
-                {/* Flow selector inside field 2 */}
                 {f.key === 'flow' && (
                   <div className="mt-2">
-                    <FlowSelector
-                      onSelect={loadFlow}
-                      currentCode={values.flow}
-                    />
+                    <FlowSelector onSelect={loadFlow} currentCode={values.flow} />
                   </div>
                 )}
               </label>
@@ -151,7 +295,7 @@ export default function DebuggingPage() {
           {error && <div className="rounded-xl border border-danger/40 bg-danger/10 px-4 py-3 text-[13.5px]">{error}</div>}
 
           <div className="flex items-center justify-between gap-3 pt-1">
-            <button type="button" onClick={() => { setValues({ problem: '', flow: '', example: '', goal: '' }); setAttachments([]); setAnswer(null); setError(null); }}
+            <button type="button" onClick={() => { setValues({ problem: '', flow: '', example: '', goal: '' }); setAttachments([]); setAnswer(null); setError(null); setSubmittedFlow(''); }}
               className="text-sm text-ink-600 hover:text-ink-800 font-semibold">Clear all</button>
             <button type="submit" disabled={loading}
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-accent hover:bg-accent-hover disabled:opacity-60 text-white font-bold text-[15px] transition-colors shadow-lg shadow-accent/20">
@@ -168,18 +312,27 @@ export default function DebuggingPage() {
               <div className="shimmer h-24 rounded mt-2" />
             </div>
           )}
+
           {!loading && answer && (
             <div className="rounded-2xl border border-ink-400/70 bg-ink-100/60 p-5 sm:p-6">
-              <div className="flex items-center justify-between mb-3">
+              {/* Header */}
+              <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2"><Logo size={20} /><span className="font-semibold">Diagnosis & fix</span></div>
                 <button type="button" onClick={() => { navigator.clipboard.writeText(answer); setCopied(true); setTimeout(() => setCopied(false), 1400); }}
                   className="text-xs font-semibold px-3 py-1 rounded-full border border-ink-400 hover:border-ink-600 transition-colors">
                   {copied ? 'Copied' : 'Copy'}
                 </button>
               </div>
+
+              {/* Markdown answer */}
               <div className="prose-base text-[14.5px] sm:text-[15px]">
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>{answer}</ReactMarkdown>
               </div>
+
+              {/* ── Diff view ── */}
+              {showDiff && (
+                <DiffView original={submittedFlow} fixed={fixedCode} />
+              )}
             </div>
           )}
         </section>
