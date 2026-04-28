@@ -49,7 +49,7 @@ function DiffView({ changesRaw }: { changesRaw: string }) {
       <div className="flex items-center gap-3 px-4 py-3 bg-ink-200/60 border-b border-ink-400/70">
         <span className="font-semibold text-[13.5px]">Line changes</span>
         <span className="text-[12px] px-2 py-0.5 rounded-full bg-[rgba(0,186,124,0.15)] text-[#00ba7c] font-semibold">+{addedCount} added</span>
-        <span className="text-[12px] px-2 py-0.5 rounded-full bg-[rgba(244,33,46,0.12)] text-[#f4212e] font-semibold">\u2212{removedCount} removed</span>
+        <span className="text-[12px] px-2 py-0.5 rounded-full bg-[rgba(244,33,46,0.12)] text-[#f4212e] font-semibold">−{removedCount} removed</span>
       </div>
       <div className="overflow-x-auto bg-[#0a0a0a]">
         <table className="w-full border-collapse font-mono text-[12.5px] leading-5">
@@ -57,13 +57,13 @@ function DiffView({ changesRaw }: { changesRaw: string }) {
             {diff.map((line, i) => {
               const bg = line.type === 'added' ? 'bg-[rgba(0,186,124,0.08)]' : line.type === 'removed' ? 'bg-[rgba(244,33,46,0.08)]' : '';
               const textColor = line.type === 'added' ? 'text-[#4ade80]' : line.type === 'removed' ? 'text-[#f87171]' : 'text-ink-600';
-              const prefix = line.type === 'added' ? '+' : line.type === 'removed' ? '\u2212' : '\u00a0';
+              const prefix = line.type === 'added' ? '+' : line.type === 'removed' ? '−' : ' ';
               const prefixColor = line.type === 'added' ? 'text-[#00ba7c] font-bold select-none' : line.type === 'removed' ? 'text-[#f4212e] font-bold select-none' : 'text-ink-500 select-none';
               return (
                 <tr key={i} className={bg}>
                   <td className={`w-6 pl-3 pr-2 py-0.5 ${prefixColor} shrink-0`}>{prefix}</td>
                   <td className={`pr-6 pl-1 py-0.5 whitespace-pre ${textColor} ${line.type === 'removed' ? 'line-through opacity-60' : ''}`}>
-                    {line.text || '\u00a0'}
+                    {line.text || ' '}
                   </td>
                 </tr>
               );
@@ -79,7 +79,7 @@ function DiffView({ changesRaw }: { changesRaw: string }) {
 const FIELDS = [
   { key: 'problem', label: '1. Describe the problem', hint: 'What is going wrong with your voice AI agent?', placeholder: "e.g. The agent hangs up before saying goodbye, or loops infinitely without routing.", rows: 3 },
   { key: 'flow', label: '2. Current Based flow', hint: 'Paste your current flow here, or load a saved one below.', placeholder: 'loop:\n    res = talk("You are a helpful receptionist.", False)\n    until "caller wants to schedule":\n        say("Sure, let me help.")', rows: 9, mono: true },
-  { key: 'example', label: '3. Example transcript / error', hint: 'Show an example of the error in transcript form.', placeholder: 'Caller: Can I book for Saturday?\nAgent: Sure, what time?\nCaller: 2pm.\n[call drops \u2014 no confirmation sent]', rows: 6, mono: true },
+  { key: 'example', label: '3. Example transcript / error', hint: 'Show an example of the error in transcript form.', placeholder: 'Caller: Can I book for Saturday?\nAgent: Sure, what time?\nCaller: 2pm.\n[call drops — no confirmation sent]', rows: 6, mono: true },
   { key: 'goal', label: '4. Goal', hint: 'What should the agent do instead?', placeholder: "Confirm the appointment, log it to our CRM, and say a friendly goodbye before hanging up.", rows: 3 },
 ];
 
@@ -143,7 +143,7 @@ export default function DebuggingPage() {
             Fix your <span className="text-accent">Based</span> agent.
           </h1>
           <p className="mt-2 text-sm sm:text-base text-ink-600 leading-relaxed">
-            Describe the problem, paste your flow, and get a diagnosis and corrected code \u2014 no coding skills required.
+            Describe the problem, paste your flow, and get a diagnosis and corrected code — no coding skills required.
           </p>
         </section>
 
@@ -183,7 +183,7 @@ export default function DebuggingPage() {
               <ul className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {attachments.map((a, i) => (
                   <li key={i} className="flex items-center justify-between gap-2 text-[13px] bg-ink-50 border border-ink-400 rounded-xl px-3 py-2">
-                    <div className="min-w-0"><div className="truncate font-medium">{a.name}</div><div className="text-ink-600 text-[11.5px]">{a.type || 'unknown'} \u00b7 {fmtBytes(a.size)}</div></div>
+                    <div className="min-w-0"><div className="truncate font-medium">{a.name}</div><div className="text-ink-600 text-[11.5px]">{a.type || 'unknown'} · {fmtBytes(a.size)}</div></div>
                     <button type="button" onClick={() => setAttachments(p => p.filter((_, j) => j !== i))} className="text-ink-600 hover:text-danger text-xs font-semibold">Remove</button>
                   </li>
                 ))}
@@ -196,7 +196,7 @@ export default function DebuggingPage() {
           <div className="flex items-center justify-between gap-3 pt-1">
             <button type="button" onClick={() => { setValues({ problem: '', flow: '', example: '', goal: '' }); setAttachments([]); setAnswer(null); setChangesRaw(null); setError(null); }} className="text-sm text-ink-600 hover:text-ink-800 font-semibold">Clear all</button>
             <button type="submit" disabled={loading} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-accent hover:bg-accent-hover disabled:opacity-60 text-white font-bold text-[15px] transition-colors shadow-lg shadow-accent/20">
-              {loading ? <><span className="w-4 h-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />Thinking\u2026</> : 'Get fix'}
+              {loading ? <><span className="w-4 h-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />Thinking…</> : 'Get fix'}
             </button>
           </div>
         </form>
