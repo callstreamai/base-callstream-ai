@@ -30,9 +30,10 @@ Your audience does not know Python or how to debug code. They want clear, copy-p
 2. **Explain in plain English.** One short paragraph: what is going wrong and why. No jargon.
 3. **Give the corrected Based code.** Always provide a complete, runnable Based snippet inside a \`\`\`python fenced block (Based is Python-flavored so use the python tag for syntax highlighting). Keep the code production-ready: top-level loop/until, try/except around API calls, .to_json() before extract(), say() before .ask() in voice goodbye/transfer handlers, time.sleep() before end_call/transfer, etc.
 4. **Call out the specific change(s).** A short bulleted "What changed" list so the user can see exactly what you fixed.
-5. **If anything is missing**, ask one specific clarifying question at the end — but always still give your best attempt at a fix above the question.
-6. **If the user only provided a goal** (no flow yet), generate a from-scratch Based flow that meets the goal, following all best practices and known limitations.
-7. **Stay grounded.** Only use functions, syntax, and patterns documented in the Based knowledge below. Do not invent APIs.
+5. **Emit a CHANGES block.** After "What changed", output a fenced block tagged \`\`\`changes containing ONLY the lines you actually removed or added — not the full file. Use - prefix for removed lines and + prefix for added lines. Include 2–3 lines of unchanged context before and after each change group (no prefix). Keep this block tight — only the specific lines that differ, not whole functions unless the whole function is new/deleted.
+6. **If anything is missing**, ask one specific clarifying question at the end — but always still give your best attempt at a fix above the question.
+7. **If the user only provided a goal** (no flow yet), generate a from-scratch Based flow that meets the goal. Skip the changes block since there is no original to diff.
+8. **Stay grounded.** Only use functions, syntax, and patterns documented in the Based knowledge below. Do not invent APIs.
 
 # Output format (always)
 **Diagnosis** — 1–3 sentences in plain English.
@@ -45,6 +46,13 @@ Your audience does not know Python or how to debug code. They want clear, copy-p
 **What changed**
 - bullet 1
 - bullet 2
+
+\`\`\`changes
+  context line before (no prefix)
+- removed line
++ added line
+  context line after (no prefix)
+\`\`\`
 
 **Try this next** (optional) — one or two short verification steps the user can run.
 
@@ -155,18 +163,16 @@ export async function POST(req: NextRequest) {
 
   const anthropic = new Anthropic({ apiKey });
 
-  let answer = '';
+  let rawAnswer = '';
   try {
     const resp = await anthropic.messages.create({
       model: process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-5-20250929',
       max_tokens: 4096,
       system: SYSTEM_PROMPT,
-      // Cast: our union includes a structural document block which the SDK
-      // type may or may not export by the same name across versions.
       messages: [{ role: 'user', content: userBlocks as unknown as Anthropic.MessageParam['content'] }],
     });
 
-    answer = resp.content
+    rawAnswer = resp.content
       .filter((b): b is Anthropic.TextBlock => b.type === 'text')
       .map((b) => b.text)
       .join('\n')
@@ -178,6 +184,15 @@ export async function POST(req: NextRequest) {
       { status: 502 },
     );
   }
+
+  // Extract the ```changes block (if present) and strip it from the displayed answer
+  let changesBlock: string | null = null;
+  const changesMatch = rawAnswer.match(/```changes\n([\s\S]*?)```/);
+  if (changesMatch) {
+    changesBlock = changesMatch[1].trimEnd();
+  }
+  // Remove the ```changes block from the answer shown to the user (it's rendered separately)
+  const answer = rawAnswer.replace(/```changes\n[\s\S]*?```/g, '').replace(/\n{3,}/g, '\n\n').trim();
 
   // Best-effort logging to Supabase (no-op if not configured)
   let submissionId: string | null = null;
@@ -226,5 +241,5 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ answer, submission_id: submissionId });
+  return NextResponse.json({ answer, changes: changesBlock, submission_id: submissionId });
 }
