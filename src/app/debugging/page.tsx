@@ -25,150 +25,45 @@ function fmtBytes(n: number) {
   return `${(n / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-// ─── Diff utilities ───────────────────────────────────────────────────────────
-type DiffLine = { type: 'added' | 'removed' | 'unchanged'; text: string; lineNum?: number };
+// ─── Diff view ────────────────────────────────────────────────────────────────
+// Parses the ```changes block Claude emits.
+// Lines starting with + = added, - = removed, space/none = context.
+type DiffLine = { type: 'added' | 'removed' | 'unchanged'; text: string };
 
-/**
- * Longest Common Subsequence — returns indices of matching lines.
- * Kept simple/bounded so it doesn't lock up the browser on huge flows.
- */
-/** Normalize a line for comparison: collapse whitespace so indentation differences don't break the LCS */
-function normLine(s: string) { return s.trimEnd().replace(/^\s+/, '').replace(/\s+/g, ' '); }
-
-function computeDiff(oldLines: string[], newLines: string[]): DiffLine[] {
-  const MAX = 600;
-  const a = oldLines.slice(0, MAX);
-  const b = newLines.slice(0, MAX);
-  const an = a.map(normLine);
-  const bn = b.map(normLine);
-  const m = a.length, n = b.length;
-
-  // Build LCS table on normalized lines
-  const dp: number[][] = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
-  for (let i = 1; i <= m; i++) {
-    for (let j = 1; j <= n; j++) {
-      dp[i][j] = an[i - 1] === bn[j - 1] ? dp[i - 1][j - 1] + 1 : Math.max(dp[i - 1][j], dp[i][j - 1]);
-    }
-  }
-
-  // Backtrack — emit original (non-normalized) text
-  const result: DiffLine[] = [];
-  let i = m, j = n;
-  while (i > 0 || j > 0) {
-    if (i > 0 && j > 0 && an[i - 1] === bn[j - 1]) {
-      result.unshift({ type: 'unchanged', text: a[i - 1] });
-      i--; j--;
-    } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
-      result.unshift({ type: 'added', text: b[j - 1] });
-      j--;
-    } else {
-      result.unshift({ type: 'removed', text: a[i - 1] });
-      i--;
-    }
-  }
-
-  for (let k = MAX; k < oldLines.length; k++) result.push({ type: 'unchanged', text: oldLines[k] });
-  return result;
+function parseChangesBlock(raw: string): DiffLine[] {
+  return raw.split('\n').map(line => {
+    if (line.startsWith('+')) return { type: 'added' as const, text: line.slice(1) };
+    if (line.startsWith('-')) return { type: 'removed' as const, text: line.slice(1) };
+    return { type: 'unchanged' as const, text: line.startsWith(' ') ? line.slice(1) : line };
+  });
 }
 
-/** Extract the first ```python or ``` code block from markdown */
-function extractCodeBlock(md: string): string {
-  const m = md.match(/```(?:python)?\n([\s\S]*?)```/);
-  return m ? m[1] : '';
-}
-
-// ─── Diff view component ──────────────────────────────────────────────────────
-function DiffView({ original, fixed }: { original: string; fixed: string }) {
-  // Default to collapsed — show only the changed lines + context
-  const [collapsed, setCollapsed] = React.useState(true);
-
-  const oldLines = original.split('\n');
-  const newLines = fixed.split('\n');
-  const diff = React.useMemo(() => computeDiff(oldLines, newLines), [original, fixed]);
-
+function DiffView({ changesRaw }: { changesRaw: string }) {
+  const diff = React.useMemo(() => parseChangesBlock(changesRaw), [changesRaw]);
   const addedCount = diff.filter(d => d.type === 'added').length;
   const removedCount = diff.filter(d => d.type === 'removed').length;
-
   if (addedCount === 0 && removedCount === 0) return null;
-
-  // For collapsed view: only show changed lines + 2 lines context around each change
-  const displayLines = React.useMemo(() => {
-    // collapsed=true → show only changed lines + 3 lines of context around each change
-    // collapsed=false → show full diff
-    if (!collapsed) return diff;
-    const changed = new Set<number>();
-    diff.forEach((d, i) => {
-      if (d.type !== 'unchanged') {
-        for (let k = i - 3; k <= i + 3; k++) {
-          if (k >= 0 && k < diff.length) changed.add(k);
-        }
-      }
-    });
-    const out: (DiffLine | { type: 'ellipsis' })[] = [];
-    let lastShown = -1;
-    diff.forEach((d, i) => {
-      if (changed.has(i)) {
-        if (lastShown >= 0 && i > lastShown + 1) out.push({ type: 'ellipsis' });
-        out.push(d);
-        lastShown = i;
-      }
-    });
-    return out;
-  }, [diff, collapsed]);
 
   return (
     <div className="mt-5 rounded-2xl border border-ink-400/70 overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center justify-between gap-3 px-4 py-3 bg-ink-200/60 border-b border-ink-400/70">
-        <div className="flex items-center gap-3">
-          <span className="font-semibold text-[13.5px]">What changed</span>
-          <span className="text-[12px] px-2 py-0.5 rounded-full bg-[rgba(0,186,124,0.15)] text-[#00ba7c] font-semibold">+{addedCount}</span>
-          <span className="text-[12px] px-2 py-0.5 rounded-full bg-[rgba(244,33,46,0.12)] text-[#f4212e] font-semibold">−{removedCount}</span>
-        </div>
-        <button
-          type="button"
-          onClick={() => setCollapsed(c => !c)}
-          className="text-[12px] text-ink-600 hover:text-ink-800 font-semibold transition-colors"
-        >
-          {collapsed ? 'Show full flow' : 'Changes only'}
-        </button>
+      <div className="flex items-center gap-3 px-4 py-3 bg-ink-200/60 border-b border-ink-400/70">
+        <span className="font-semibold text-[13.5px]">Line changes</span>
+        <span className="text-[12px] px-2 py-0.5 rounded-full bg-[rgba(0,186,124,0.15)] text-[#00ba7c] font-semibold">+{addedCount} added</span>
+        <span className="text-[12px] px-2 py-0.5 rounded-full bg-[rgba(244,33,46,0.12)] text-[#f4212e] font-semibold">\u2212{removedCount} removed</span>
       </div>
-
-      {/* Diff body */}
       <div className="overflow-x-auto bg-[#0a0a0a]">
         <table className="w-full border-collapse font-mono text-[12.5px] leading-5">
           <tbody>
-            {displayLines.map((line, i) => {
-              if ('type' in line && line.type === 'ellipsis') {
-                return (
-                  <tr key={`el-${i}`}>
-                    <td colSpan={2} className="px-4 py-1 text-ink-600 text-[11px] bg-ink-200/30 select-none">⋯</td>
-                  </tr>
-                );
-              }
-              const d = line as DiffLine;
-              const bg =
-                d.type === 'added' ? 'bg-[rgba(0,186,124,0.08)]' :
-                d.type === 'removed' ? 'bg-[rgba(244,33,46,0.08)]' :
-                '';
-              const textColor =
-                d.type === 'added' ? 'text-[#4ade80]' :
-                d.type === 'removed' ? 'text-[#f87171]' :
-                'text-ink-600';
-              const prefix =
-                d.type === 'added' ? '+' :
-                d.type === 'removed' ? '−' :
-                ' ';
-              const prefixColor =
-                d.type === 'added' ? 'text-[#00ba7c] font-bold select-none' :
-                d.type === 'removed' ? 'text-[#f4212e] font-bold select-none' :
-                'text-ink-500 select-none';
-
+            {diff.map((line, i) => {
+              const bg = line.type === 'added' ? 'bg-[rgba(0,186,124,0.08)]' : line.type === 'removed' ? 'bg-[rgba(244,33,46,0.08)]' : '';
+              const textColor = line.type === 'added' ? 'text-[#4ade80]' : line.type === 'removed' ? 'text-[#f87171]' : 'text-ink-600';
+              const prefix = line.type === 'added' ? '+' : line.type === 'removed' ? '\u2212' : '\u00a0';
+              const prefixColor = line.type === 'added' ? 'text-[#00ba7c] font-bold select-none' : line.type === 'removed' ? 'text-[#f4212e] font-bold select-none' : 'text-ink-500 select-none';
               return (
-                <tr key={i} className={`${bg} group`}>
+                <tr key={i} className={bg}>
                   <td className={`w-6 pl-3 pr-2 py-0.5 ${prefixColor} shrink-0`}>{prefix}</td>
-                  <td className={`pr-6 pl-1 py-0.5 whitespace-pre ${textColor} ${d.type === 'removed' ? 'line-through opacity-60' : ''}`}>
-                    {d.text || '\u00a0'}
+                  <td className={`pr-6 pl-1 py-0.5 whitespace-pre ${textColor} ${line.type === 'removed' ? 'line-through opacity-60' : ''}`}>
+                    {line.text || '\u00a0'}
                   </td>
                 </tr>
               );
@@ -180,11 +75,11 @@ function DiffView({ original, fixed }: { original: string; fixed: string }) {
   );
 }
 
-// ─── Fields config ────────────────────────────────────────────────────────────
+// ─── Fields ───────────────────────────────────────────────────────────────────
 const FIELDS = [
   { key: 'problem', label: '1. Describe the problem', hint: 'What is going wrong with your voice AI agent?', placeholder: "e.g. The agent hangs up before saying goodbye, or loops infinitely without routing.", rows: 3 },
   { key: 'flow', label: '2. Current Based flow', hint: 'Paste your current flow here, or load a saved one below.', placeholder: 'loop:\n    res = talk("You are a helpful receptionist.", False)\n    until "caller wants to schedule":\n        say("Sure, let me help.")', rows: 9, mono: true },
-  { key: 'example', label: '3. Example transcript / error', hint: 'Show an example of the error in transcript form.', placeholder: 'Caller: Can I book for Saturday?\nAgent: Sure, what time?\nCaller: 2pm.\n[call drops — no confirmation sent]', rows: 6, mono: true },
+  { key: 'example', label: '3. Example transcript / error', hint: 'Show an example of the error in transcript form.', placeholder: 'Caller: Can I book for Saturday?\nAgent: Sure, what time?\nCaller: 2pm.\n[call drops \u2014 no confirmation sent]', rows: 6, mono: true },
   { key: 'goal', label: '4. Goal', hint: 'What should the agent do instead?', placeholder: "Confirm the appointment, log it to our CRM, and say a friendly goodbye before hanging up.", rows: 3 },
 ];
 
@@ -194,8 +89,7 @@ export default function DebuggingPage() {
   const [attachments, setAttachments] = React.useState<Attachment[]>([]);
   const [loading, setLoading] = React.useState(false);
   const [answer, setAnswer] = React.useState<string | null>(null);
-  // Store the original flow at submit time for diffing
-  const [submittedFlow, setSubmittedFlow] = React.useState('');
+  const [changesRaw, setChangesRaw] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [copied, setCopied] = React.useState(false);
   const fileRef = React.useRef<HTMLInputElement>(null);
@@ -220,29 +114,27 @@ export default function DebuggingPage() {
   }
 
   async function submit(e?: React.FormEvent) {
-    e?.preventDefault(); setError(null); setAnswer(null);
+    e?.preventDefault(); setError(null); setAnswer(null); setChangesRaw(null);
     if (!values.problem.trim() && !values.flow.trim() && !values.example.trim() && !values.goal.trim() && !attachments.length) {
       setError('Fill in at least one field or attach a file.'); return;
     }
-    setSubmittedFlow(values.flow.trim());
     setLoading(true);
     try {
       const resp = await fetch('/api/ask', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...values, attachments }) });
       const json = await resp.json();
       if (!resp.ok) setError(json.error || 'Something went wrong.');
-      else { setAnswer(json.answer ?? ''); setTimeout(() => answerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80); }
+      else {
+        setAnswer(json.answer ?? '');
+        setChangesRaw(json.changes ?? null);
+        setTimeout(() => answerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+      }
     } catch (err) { setError(err instanceof Error ? err.message : 'Network error.'); }
     finally { setLoading(false); }
   }
 
-  // Extract fixed code from the answer for diffing
-  const fixedCode = React.useMemo(() => answer ? extractCodeBlock(answer) : '', [answer]);
-  const showDiff = !!submittedFlow && !!fixedCode;
-
   return (
     <main className="min-h-screen bg-black">
       <div className="mx-auto max-w-3xl px-4 sm:px-6 pb-32 pt-6 sm:pt-10">
-        {/* Hero */}
         <section className="mb-7">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-danger/10 border border-danger/30 text-danger text-[11.5px] font-semibold mb-3">
             <span className="w-1.5 h-1.5 rounded-full bg-danger" /> Debugging
@@ -251,7 +143,7 @@ export default function DebuggingPage() {
             Fix your <span className="text-accent">Based</span> agent.
           </h1>
           <p className="mt-2 text-sm sm:text-base text-ink-600 leading-relaxed">
-            Describe the problem, paste your flow, and get a diagnosis and corrected code — no coding skills required.
+            Describe the problem, paste your flow, and get a diagnosis and corrected code \u2014 no coding skills required.
           </p>
         </section>
 
@@ -265,9 +157,7 @@ export default function DebuggingPage() {
                 </div>
                 <span className="block text-[12.5px] text-ink-600 mt-0.5">{f.hint}</span>
                 {f.key === 'flow' && (
-                  <div className="mt-2">
-                    <FlowSelector onSelect={loadFlow} currentCode={values.flow} />
-                  </div>
+                  <div className="mt-2"><FlowSelector onSelect={loadFlow} currentCode={values.flow} /></div>
                 )}
               </label>
               <textarea
@@ -280,24 +170,20 @@ export default function DebuggingPage() {
             </div>
           ))}
 
-          {/* Attachments */}
           <div className="rounded-2xl border border-ink-400/70 bg-ink-100/40 p-4 sm:p-5">
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <div>
                 <div className="font-semibold text-[15px]">Attachments</div>
                 <div className="text-[12.5px] text-ink-600">Images, PDFs, .py or .based files. Up to {MAX_FILES} files, {fmtBytes(MAX_TOTAL_BYTES)} total.</div>
               </div>
-              <button type="button" onClick={() => fileRef.current?.click()}
-                className="px-3.5 py-1.5 rounded-full border border-ink-400 hover:border-ink-600 text-sm font-semibold transition-colors">
-                Add files
-              </button>
+              <button type="button" onClick={() => fileRef.current?.click()} className="px-3.5 py-1.5 rounded-full border border-ink-400 hover:border-ink-600 text-sm font-semibold transition-colors">Add files</button>
               <input ref={fileRef} type="file" multiple hidden onChange={e => onFiles(e.target.files)} />
             </div>
             {attachments.length > 0 && (
               <ul className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {attachments.map((a, i) => (
                   <li key={i} className="flex items-center justify-between gap-2 text-[13px] bg-ink-50 border border-ink-400 rounded-xl px-3 py-2">
-                    <div className="min-w-0"><div className="truncate font-medium">{a.name}</div><div className="text-ink-600 text-[11.5px]">{a.type || 'unknown'} · {fmtBytes(a.size)}</div></div>
+                    <div className="min-w-0"><div className="truncate font-medium">{a.name}</div><div className="text-ink-600 text-[11.5px]">{a.type || 'unknown'} \u00b7 {fmtBytes(a.size)}</div></div>
                     <button type="button" onClick={() => setAttachments(p => p.filter((_, j) => j !== i))} className="text-ink-600 hover:text-danger text-xs font-semibold">Remove</button>
                   </li>
                 ))}
@@ -308,16 +194,13 @@ export default function DebuggingPage() {
           {error && <div className="rounded-xl border border-danger/40 bg-danger/10 px-4 py-3 text-[13.5px]">{error}</div>}
 
           <div className="flex items-center justify-between gap-3 pt-1">
-            <button type="button" onClick={() => { setValues({ problem: '', flow: '', example: '', goal: '' }); setAttachments([]); setAnswer(null); setError(null); setSubmittedFlow(''); }}
-              className="text-sm text-ink-600 hover:text-ink-800 font-semibold">Clear all</button>
-            <button type="submit" disabled={loading}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-accent hover:bg-accent-hover disabled:opacity-60 text-white font-bold text-[15px] transition-colors shadow-lg shadow-accent/20">
-              {loading ? <><span className="w-4 h-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />Thinking…</> : 'Get fix'}
+            <button type="button" onClick={() => { setValues({ problem: '', flow: '', example: '', goal: '' }); setAttachments([]); setAnswer(null); setChangesRaw(null); setError(null); }} className="text-sm text-ink-600 hover:text-ink-800 font-semibold">Clear all</button>
+            <button type="submit" disabled={loading} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-accent hover:bg-accent-hover disabled:opacity-60 text-white font-bold text-[15px] transition-colors shadow-lg shadow-accent/20">
+              {loading ? <><span className="w-4 h-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />Thinking\u2026</> : 'Get fix'}
             </button>
           </div>
         </form>
 
-        {/* Answer */}
         <section ref={answerRef} className="mt-8">
           {loading && (
             <div className="rounded-2xl border border-ink-400/70 bg-ink-100/40 p-5 space-y-3">
@@ -325,27 +208,18 @@ export default function DebuggingPage() {
               <div className="shimmer h-24 rounded mt-2" />
             </div>
           )}
-
           {!loading && answer && (
             <div className="rounded-2xl border border-ink-400/70 bg-ink-100/60 p-5 sm:p-6">
-              {/* Header */}
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2"><Logo size={20} /><span className="font-semibold">Diagnosis & fix</span></div>
-                <button type="button" onClick={() => { navigator.clipboard.writeText(answer); setCopied(true); setTimeout(() => setCopied(false), 1400); }}
-                  className="text-xs font-semibold px-3 py-1 rounded-full border border-ink-400 hover:border-ink-600 transition-colors">
+                <button type="button" onClick={() => { navigator.clipboard.writeText(answer); setCopied(true); setTimeout(() => setCopied(false), 1400); }} className="text-xs font-semibold px-3 py-1 rounded-full border border-ink-400 hover:border-ink-600 transition-colors">
                   {copied ? 'Copied' : 'Copy'}
                 </button>
               </div>
-
-              {/* Markdown answer */}
               <div className="prose-base text-[14.5px] sm:text-[15px]">
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>{answer}</ReactMarkdown>
               </div>
-
-              {/* ── Diff view ── */}
-              {showDiff && (
-                <DiffView original={submittedFlow} fixed={fixedCode} />
-              )}
+              {changesRaw && <DiffView changesRaw={changesRaw} />}
             </div>
           )}
         </section>
