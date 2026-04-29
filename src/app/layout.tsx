@@ -6,13 +6,13 @@ import { Nav } from '@/components/Nav';
 import { AuthModal } from '@/components/AuthModal';
 
 export const metadata: Metadata = {
-  title: 'Base — powered by Callstream AI',
+  title: 'Base — powered by Call Stream AI',
   description: 'Fix and vibe-code voice AI agents in the Based language. No coding skills required.',
-  applicationName: 'Base — powered by Callstream AI',
+  applicationName: 'Base — powered by Call Stream AI',
   manifest: '/manifest.webmanifest',
   appleWebApp: { capable: true, title: 'Base AI', statusBarStyle: 'black-translucent' },
   openGraph: {
-    title: 'Base — powered by Callstream AI',
+    title: 'Base — powered by Call Stream AI',
     description: 'Debug and generate voice AI agents in Based — no code skills needed.',
     type: 'website',
   },
