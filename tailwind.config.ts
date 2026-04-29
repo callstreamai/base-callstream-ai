@@ -20,7 +20,7 @@ const config: Config = {
           900: '#ffffff',
         },
         accent: {
-          DEFAULT: '#D560B2', // Callstream magenta
+          DEFAULT: '#D560B2', // Call Stream magenta
           hover: '#C24BA0',
           soft: 'rgba(213, 96, 178, 0.12)',
           ring: 'rgba(213, 96, 178, 0.45)',
