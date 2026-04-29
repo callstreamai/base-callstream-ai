@@ -7,7 +7,7 @@ type Props = {
 };
 
 /**
- * Callstream AI logo — sound-wave mark.
+ * Call Stream AI logo — sound-wave mark.
  * Sourced from https://logo.callstreamai.com/ official mark.
  */
 export function Logo({ size = 32, className = '', animated = false }: Props) {
@@ -18,7 +18,7 @@ export function Logo({ size = 32, className = '', animated = false }: Props) {
       viewBox="0 0 64 64"
       xmlns="http://www.w3.org/2000/svg"
       className={`${animated ? 'wave-pulse' : ''} ${className}`}
-      aria-label="Callstream AI"
+      aria-label="Call Stream AI"
     >
       <circle cx="12" cy="32" r="4.5" fill="#D560B2" />
       <path
