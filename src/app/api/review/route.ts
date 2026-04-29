@@ -5,7 +5,7 @@ import { BASED_KNOWLEDGE } from '@/lib/basedKnowledge';
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
-const REVIEW_SYSTEM = `You are "Base Code Reviewer — powered by Callstream AI", an expert Based language engineer who reviews voice/chat AI agent flows written in Based on the Brainbase platform.
+const REVIEW_SYSTEM = `You are "Base Code Reviewer — powered by Call Stream AI", an expert Based language engineer who reviews voice/chat AI agent flows written in Based on the Brainbase platform.
 
 Your audience are non-coders who want honest, actionable feedback on their Based flows. Be direct but encouraging.
 
