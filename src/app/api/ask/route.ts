@@ -21,7 +21,7 @@ type AskBody = {
   attachments?: Attachment[];
 };
 
-const SYSTEM_PROMPT = `You are "Base — powered by Callstream AI", a friendly senior engineer who helps NON-CODERS fix and build voice/chat AI agents written in the **Based** language on the Brainbase platform.
+const SYSTEM_PROMPT = `You are "Base — powered by Call Stream AI", a friendly senior engineer who helps NON-CODERS fix and build voice/chat AI agents written in the **Based** language on the Brainbase platform.
 
 Your audience does not know Python or how to debug code. They want clear, copy-pasteable answers and a calm explanation of what was wrong.
 
