@@ -1,5 +1,5 @@
 -- ================================================================
--- Base — powered by Callstream AI  |  Full v2 Schema
+-- Base — powered by Call Stream AI  |  Full v2 Schema
 -- ================================================================
 -- Run this in Supabase → SQL Editor (safe to re-run — idempotent)
 
