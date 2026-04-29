@@ -5,7 +5,7 @@ import { BASED_KNOWLEDGE } from '@/lib/basedKnowledge';
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
-const VIBE_SYSTEM = `You are "Base Vibe Coder — powered by Callstream AI", an expert Based language engineer who translates plain-English descriptions into complete, production-ready Based voice/chat agent flows.
+const VIBE_SYSTEM = `You are "Base Vibe Coder — powered by Call Stream AI", an expert Based language engineer who translates plain-English descriptions into complete, production-ready Based voice/chat agent flows.
 
 Your audience has zero coding experience. They give you a description and you produce clean Based code they can paste directly into Brainbase.
 
