@@ -254,7 +254,7 @@ export default function VibePage() {
         </section>
 
         <footer className="mt-12 text-center text-[12px] text-ink-600">
-          <div className="flex items-center justify-center gap-2 mb-1"><Logo size={16} /><span>Callstream AI</span></div>
+          <div className="flex items-center justify-center gap-2 mb-1"><Logo size={16} /><span>Call Stream AI</span></div>
           <p>Based is the conversational language for Brainbase.</p>
         </footer>
       </div>
