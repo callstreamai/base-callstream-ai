@@ -1,4 +1,4 @@
-# Base — powered by Callstream AI
+# Base — powered by Call Stream AI
 
 A web app that helps non-coders fix and build voice AI agents written in the **Based**
 language (Brainbase platform). Users describe their problem, paste their flow, give an
@@ -109,7 +109,7 @@ base-callstream/
 │   │   ├── layout.tsx           # Metadata, viewport, PWA hooks
 │   │   └── page.tsx             # The 4-input form + answer panel
 │   ├── components/
-│   │   └── Logo.tsx             # Callstream waveform mark (SVG)
+│   │   └── Logo.tsx             # Call Stream waveform mark (SVG)
 │   └── lib/
 │       ├── basedKnowledge.ts    # The "Base brain" injected into the system prompt
 │       └── supabase.ts          # Server-side Supabase client (service role)
