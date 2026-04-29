@@ -8,6 +8,7 @@ import { useAuth } from '@/context/AuthContext';
 const tabs = [
   { href: '/debugging', label: 'Debugging' },
   { href: '/vibe', label: 'Vibe' },
+  { href: '/review', label: 'Review' },
 ];
 
 export function Nav() {
