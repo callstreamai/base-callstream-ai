@@ -37,7 +37,7 @@ export function Nav() {
           <Logo size={26} animated />
           <div className="hidden sm:flex flex-col leading-tight">
             <span className="font-bold text-[14px] tracking-tight">Base</span>
-            <span className="text-[10px] text-ink-600 -mt-0.5">powered by Callstream AI</span>
+            <span className="text-[10px] text-ink-600 -mt-0.5">powered by Call Stream AI</span>
           </div>
         </Link>
 
